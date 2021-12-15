@@ -31,7 +31,7 @@ int validate_checksum(config_header *config) {
     return crc == 0xffffffff;
 }
 
-int DecodeCFG(FILE *Decode) { // previously called 'f'
+int DecodeCFG(FILE *Decode, char *FilePath) { // previously called 'f'
     unsigned char *buf = malloc(MAX_HEADER_AND_CONFIG_SIZE);
     if (!buf) {
         perror("malloc");
@@ -49,6 +49,19 @@ int DecodeCFG(FILE *Decode) { // previously called 'f'
     }
     fread(buf, MAX_HEADER_AND_CONFIG_SIZE, 1, Decode);
     fclose(Decode);
+
+    // Now re-open the path as write and output the values to the file
+    // Or we could take the name and replace .cfg with .txt and make a new file
+    int FilePathSize = strlen(FilePath);
+    FilePath[FilePathSize - 1] = 't';
+    FilePath[FilePathSize - 2] = 'x';
+    FilePath[FilePathSize - 3] = 't';
+
+    FILE *ClearText = fopen(FilePath, "wb");
+    if (!ClearText) {
+        perror(FilePath);
+        return EXIT_FAILURE;
+    }
 
     config_header *config = (config_header *) buf;
     if (config->len == 0 || config->len + sizeof(config_header) > MAX_HEADER_AND_CONFIG_SIZE) {
@@ -74,9 +87,11 @@ int DecodeCFG(FILE *Decode) { // previously called 'f'
 
     for (int i = sizeof(config_header); i < config->len + sizeof(config_header); i++) {
         if (buf[i] == '\0') {
-            printf("\n");
+            //printf("\n");
+            fprintf(ClearText, "\n");
         } else {
-            printf("%c", buf[i]);
+            // printf("%c", buf[i]);
+            fprintf(ClearText, "%c", buf[i]);
         }
     }
 
@@ -84,7 +99,7 @@ int DecodeCFG(FILE *Decode) { // previously called 'f'
     return EXIT_SUCCESS;
 }
 
-int EncodeCFG(FILE *Encode) { // Make sure to read the whole file into RAM before overwriting the file.
+int EncodeCFG(FILE *Encode, char *FilePath) { // Make sure to read the whole file into RAM before overwriting the file.
     perror("encoding not yet implemented");
     return EXIT_FAILURE;
 }
@@ -105,7 +120,7 @@ int main(int argc, char *argv[]) {
             return EXIT_FAILURE;
         }
 
-        DecodeCFG(Decode);
+        DecodeCFG(Decode, argv[2]);
     } else if (strcasecmp(argv[1], "-e") == 0 || strcasecmp(argv[1], "-encode") == 0) {
         // Encode function call
         FILE *Encode = fopen(argv[2], "rb");
@@ -114,7 +129,7 @@ int main(int argc, char *argv[]) {
             return EXIT_FAILURE;
         }
 
-        EncodeCFG(Encode);
+        EncodeCFG(Encode, argv[2]);
     } else {
         fprintf(stderr, "Unknown argument: '%s'\n", argv[1]);
     }
