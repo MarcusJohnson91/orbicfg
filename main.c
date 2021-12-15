@@ -19,37 +19,36 @@ typedef struct config_header {
     uint32_t crc;
 } config_header;
 
-int validate_checksum(config_header *config);
+int validate_checksum(config_header *config) {
+    uint32_t len = config->len / sizeof(uint32_t);
+    uint32_t crc = config->crc;
+    config++;
 
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        fprintf(stderr, "usage: %s <config backup (e.g. NETGEAR_Orbi.cfg)>\n", argv[0]);
-        return EXIT_FAILURE;
+    for (int i = 0; i < len; i++) {
+        crc += config->magic;
+        config = (config_header *) &config->len;
     }
+    return crc == 0xffffffff;
+}
 
-    FILE *f = fopen(argv[1], "rb");
-    if (!f) {
-        perror(argv[1]);
-        return EXIT_FAILURE;
-    }
-
+int DecodeCFG(FILE *Decode) { // previously called 'f'
     unsigned char *buf = malloc(MAX_HEADER_AND_CONFIG_SIZE);
     if (!buf) {
         perror("malloc");
         return EXIT_FAILURE;
     }
 
-    fread(buf, strlen(WEB_CONFIG_TAR_NAME), 1, f);
+    fread(buf, strlen(WEB_CONFIG_TAR_NAME), 1, Decode);
     if (!memcmp(buf, WEB_CONFIG_TAR_NAME, strlen(WEB_CONFIG_TAR_NAME))) {
-        if (fseek(f, WEB_CONFIG_OFFSET, SEEK_SET) < 0) {
+        if (fseek(Decode, WEB_CONFIG_OFFSET, SEEK_SET) < 0) {
             perror("fseek");
             return EXIT_FAILURE;
         }
     } else {
-        rewind(f);
+        rewind(Decode);
     }
-    fread(buf, MAX_HEADER_AND_CONFIG_SIZE, 1, f);
-    fclose(f);
+    fread(buf, MAX_HEADER_AND_CONFIG_SIZE, 1, Decode);
+    fclose(Decode);
 
     config_header *config = (config_header *) buf;
     if (config->len == 0 || config->len + sizeof(config_header) > MAX_HEADER_AND_CONFIG_SIZE) {
@@ -85,14 +84,40 @@ int main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
 }
 
-int validate_checksum(config_header *config) {
-    uint32_t len = config->len / sizeof(uint32_t);
-    uint32_t crc = config->crc;
-    config++;
+int EncodeCFG(FILE *Encode) { // Make sure to read the whole file into RAM before overwriting the file.
+    perror("encoding not yet implemented");
+    return EXIT_FAILURE;
+}
 
-    for (int i = 0; i < len; i++) {
-        crc += config->magic;
-        config = (config_header *) &config->len;
+int main(int argc, char *argv[]) {
+    /* -d decode <Settings.cfg> -e encode <Settings.cfg> */
+
+    if (argc != 3) {
+        fprintf(stderr, "Usage: (-d (decode) | -e (encode)) <Settings.cfg>\n");
+        return EXIT_FAILURE;
     }
-    return crc == 0xffffffff;
+
+    if (strcasecmp(argv[1], "-d") == 0 || strcasecmp(argv[1], "-decode") == 0) { //  argv[1] == "-d"
+        // Decode function call
+        FILE *Decode = fopen(argv[2], "rb");
+        if (!Decode) {
+            perror(argv[2]);
+            return EXIT_FAILURE;
+        }
+
+        DecodeCFG(Decode);
+    } else if (strcasecmp(argv[1], "-e") == 0 || strcasecmp(argv[1], "-encode") == 0) {
+        // Encode function call
+        FILE *Encode = fopen(argv[2], "rb");
+        if (!Encode) {
+            perror(argv[2]);
+            return EXIT_FAILURE;
+        }
+
+        EncodeCFG(Encode);
+    } else {
+        fprintf(stderr, "Unknown argument: '%s'\n", argv[1]);
+    }
+
+    return EXIT_SUCCESS;
 }
